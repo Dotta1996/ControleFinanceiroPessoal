@@ -4,13 +4,14 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChang
 
 // Configuração do Firebase (substitua pelos seus dados)
 const firebaseConfig = {
-  apiKey: "SUA_API_KEY",
-  authDomain: "SEU_PROJETO.firebaseapp.com",
-  projectId: "SEU_PROJETO",
-  storageBucket: "SEU_PROJETO.appspot.com",
-  messagingSenderId: "SEU_ID",
-  appId: "SEU_APP_ID"
+  apiKey: "AIzaSyBkLoi7cu_qLWiPTlHiNdh1-WpHIHrHCnA",
+  authDomain: "controle-financeiro-pess-64800.firebaseapp.com",
+  projectId: "controle-financeiro-pess-64800",
+  storageBucket: "controle-financeiro-pess-64800.firebasestorage.app",
+  messagingSenderId: "704824842865",
+  appId: "1:704824842865:web:2871181735530a720659d0"
 };
+
 
 // Inicializa o Firebase
 const app = initializeApp(firebaseConfig);
