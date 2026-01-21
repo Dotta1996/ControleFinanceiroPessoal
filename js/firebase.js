@@ -16,3 +16,6 @@ const app = getApps().length === 0
 
 export { app };
 
+import { getApps } from "firebase/app";
+
+console.log("Apps Firebase:", getApps());
