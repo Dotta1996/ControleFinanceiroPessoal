@@ -1,5 +1,4 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { initializeApp, getApps } from "firebase/app";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBkLoi7cu_qLWiPTlHiNdh1-WpHIHrHCnA",
@@ -10,5 +9,10 @@ const firebaseConfig = {
   appId: "1:704824842865:web:2871181735530a720659d0"
 };
 
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+// 🔒 Só inicializa se ainda não existir
+const app = getApps().length === 0
+  ? initializeApp(firebaseConfig)
+  : getApps()[0];
+
+export { app };
+
