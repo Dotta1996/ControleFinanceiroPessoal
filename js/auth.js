@@ -5,6 +5,10 @@ import { app } from "./firebase.js";
 
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
+console.log("auth.js carregou");
+
+const btn = document.getElementById("loginGoogle");
+console.log("Botão encontrado:", btn);
 
 document.getElementById("loginGoogle").onclick = async () => {
   try {
