@@ -2,14 +2,20 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Controle Financeiro</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login com Google</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js" defer></script>
 </head>
 <body>
-
-<h1>Controle Financeiro1</h1>
-
-<button id="loginGoogle">Entrar com Google</button>
-
-<script type="module" src="./auth.js"></script>
+  <div class="login-container">
+    <h2>Entrar com Google</h2>
+    <button id="google-login">Login com Google</button>
+    <div id="user-info" style="display: none;">
+      <p id="user-name"></p>
+      <img id="user-photo" alt="Foto do usuário">
+      <button id="logout">Sair</button>
+    </div>
+  </div>
 </body>
 </html>
