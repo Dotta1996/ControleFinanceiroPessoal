@@ -8,6 +8,7 @@ const firebaseConfig = {
   appId: "1:704824842865:web:2871181735530a720659d0"
 };
 
+
 // Inicializa Firebase
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
@@ -23,19 +24,19 @@ const userPhoto = document.getElementById('user-photo');
 // Login
 loginBtn.addEventListener('click', () => {
   auth.signInWithPopup(provider)
-    .then((result) => console.log('Usuário logado:', result.user))
-    .catch((error) => console.error(error));
+    .then(result => console.log('Usuário logado:', result.user))
+    .catch(err => console.error(err));
 });
 
 // Logout
 logoutBtn.addEventListener('click', () => {
   auth.signOut()
     .then(() => console.log('Usuário deslogado'))
-    .catch((error) => console.error(error));
+    .catch(err => console.error(err));
 });
 
 // Detecta login/logout
-auth.onAuthStateChanged((user) => {
+auth.onAuthStateChanged(user => {
   if (user) {
     loginBtn.style.display = 'none';
     userInfo.style.display = 'block';
@@ -46,3 +47,4 @@ auth.onAuthStateChanged((user) => {
     userInfo.style.display = 'none';
   }
 });
+
