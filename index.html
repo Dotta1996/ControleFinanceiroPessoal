@@ -5,21 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login com Google</title>
   <link rel="stylesheet" href="style.css">
-  <!-- Firebase App (necessário) -->
-  <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-app-compat.js"></script>
-  <!-- Firebase Auth -->
-  <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-auth-compat.js"></script>
-  <script src="app.js"></script>
 </head>
 <body>
   <div class="login-container">
     <h2>Entrar com Google</h2>
-    <button id="google-login">Login com Google2</button>
+    <button id="google-login">Login com Google</button>
     <div id="user-info" style="display: none;">
       <p id="user-name"></p>
       <img id="user-photo" alt="Foto do usuário">
       <button id="logout">Sair</button>
     </div>
   </div>
+
+  <!-- Firebase (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-auth-compat.js"></script>
+  
+  <!-- Seu JS -->
+  <script src="app.js"></script>
 </body>
 </html>
