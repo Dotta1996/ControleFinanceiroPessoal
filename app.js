@@ -8,7 +8,6 @@ const firebaseConfig = {
   appId: "1:704824842865:web:2871181735530a720659d0"
 };
 
-
 // Inicializa Firebase
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
@@ -21,7 +20,7 @@ const userInfo = document.getElementById('user-info');
 const userName = document.getElementById('user-name');
 const userPhoto = document.getElementById('user-photo');
 
-// Login
+// Login com Google
 loginBtn.addEventListener('click', () => {
   auth.signInWithPopup(provider)
     .then(result => console.log('Usuário logado:', result.user))
@@ -47,4 +46,3 @@ auth.onAuthStateChanged(user => {
     userInfo.style.display = 'none';
   }
 });
-
