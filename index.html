@@ -5,62 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Controle Financeiro Pessoal - Login</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      display: flex;
-      height: 100vh;
-      justify-content: center;
-      align-items: center;
-      background: #f0f0f0;
-    }
-
-    .login-container {
-      background: #fff;
-      padding: 2rem;
-      border-radius: 10px;
-      text-align: center;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-
-    button {
-      padding: 10px 20px;
-      border: none;
-      background: #4285F4;
-      color: #fff;
-      border-radius: 5px;
-      cursor: pointer;
-      margin-top: 10px;
-    }
-
-    button:hover {
-      background: #357ae8;
-    }
-
-    img {
-      width: 50px;
-      border-radius: 50%;
-      margin-top: 10px;
-    }
+    body { font-family: Arial; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f0f0; }
+    .login-container { background: #fff; padding: 2rem; border-radius: 10px; text-align: center; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    button { padding: 10px 20px; border: none; background: #4285F4; color: #fff; border-radius: 5px; cursor: pointer; margin-top: 10px; }
+    button:hover { background: #357ae8; }
+    img { width: 50px; border-radius: 50%; margin-top: 10px; }
   </style>
 </head>
 <body>
   <div class="login-container">
-    <h2>Entrar com Google</h2>
+    <h2>Entrar com Google15</h2>
     <button id="google-login">Login com Google</button>
-    <div id="user-info" style="display: none;">
+    <div id="user-info" style="display:none;">
       <p id="user-name"></p>
       <img id="user-photo" alt="Foto do usuário">
       <button id="logout">Sair</button>
     </div>
   </div>
 
-  <!-- Firebase compat -->
+  <!-- Firebase compat CDN -->
   <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-auth-compat.js"></script>
 
-  <!-- Script inline -->
   <script>
-    // Configuração do Firebase
+    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyBkLoi7cu_qLWiPTlHiNdh1-WpHIHrHCnA",
       authDomain: "controle-financeiro-pess-64800.firebaseapp.com",
@@ -82,10 +50,10 @@
     const userName = document.getElementById('user-name');
     const userPhoto = document.getElementById('user-photo');
 
-    // Login com Google
+    // Login Google
     loginBtn.addEventListener('click', () => {
       auth.signInWithPopup(provider)
-        .then(result => console.log('Usuário logado:', result.user))
+        .then(res => console.log('Usuário logado:', res.user))
         .catch(err => console.error(err));
     });
 
@@ -98,7 +66,7 @@
 
     // Detecta login/logout
     auth.onAuthStateChanged(user => {
-      if (user) {
+      if(user){
         loginBtn.style.display = 'none';
         userInfo.style.display = 'block';
         userName.textContent = `Olá, ${user.displayName}`;
