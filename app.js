@@ -1,22 +1,17 @@
-// Importar Firebase
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-app.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-auth.js";
-
-// Configuração do Firebase (substitua pelos seus dados)
+// Configuração do Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyBkLoi7cu_qLWiPTlHiNdh1-WpHIHrHCnA",
-  authDomain: "controle-financeiro-pess-64800.firebaseapp.com",
-  projectId: "controle-financeiro-pess-64800",
-  storageBucket: "controle-financeiro-pess-64800.firebasestorage.app",
-  messagingSenderId: "704824842865",
-  appId: "1:704824842865:web:2871181735530a720659d0"
+  apiKey: "SUA_API_KEY",
+  authDomain: "SEU_PROJETO.firebaseapp.com",
+  projectId: "SEU_PROJETO",
+  storageBucket: "SEU_PROJETO.appspot.com",
+  messagingSenderId: "SEU_ID",
+  appId: "SEU_APP_ID"
 };
 
-
-// Inicializa o Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const provider = new GoogleAuthProvider();
+// Inicializa Firebase
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const provider = new firebase.auth.GoogleAuthProvider();
 
 // Seletores
 const loginBtn = document.getElementById('google-login');
@@ -25,26 +20,22 @@ const userInfo = document.getElementById('user-info');
 const userName = document.getElementById('user-name');
 const userPhoto = document.getElementById('user-photo');
 
-// Login com Google
+// Login
 loginBtn.addEventListener('click', () => {
-  signInWithPopup(auth, provider)
-    .then((result) => {
-      console.log('Usuário logado:', result.user);
-    })
-    .catch((error) => {
-      console.error(error);
-    });
+  auth.signInWithPopup(provider)
+    .then((result) => console.log('Usuário logado:', result.user))
+    .catch((error) => console.error(error));
 });
 
 // Logout
 logoutBtn.addEventListener('click', () => {
-  signOut(auth)
+  auth.signOut()
     .then(() => console.log('Usuário deslogado'))
     .catch((error) => console.error(error));
 });
 
-// Detectar mudança de estado de login
-onAuthStateChanged(auth, (user) => {
+// Detecta login/logout
+auth.onAuthStateChanged((user) => {
   if (user) {
     loginBtn.style.display = 'none';
     userInfo.style.display = 'block';
