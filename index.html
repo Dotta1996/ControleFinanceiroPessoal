@@ -1,81 +1,40 @@
+
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Controle Financeiro Pessoal - Login</title>
-  <style>
-    body { font-family: Arial; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f0f0; }
-    .login-container { background: #fff; padding: 2rem; border-radius: 10px; text-align: center; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-    button { padding: 10px 20px; border: none; background: #4285F4; color: #fff; border-radius: 5px; cursor: pointer; margin-top: 10px; }
-    button:hover { background: #357ae8; }
-    img { width: 50px; border-radius: 50%; margin-top: 10px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle Financeiro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.12.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "firebase/": "https://esm.sh/firebase@^12.8.0/",
+    "recharts": "https://esm.sh/recharts@^3.7.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "date-fns": "https://esm.sh/date-fns@^4.1.0",
+    "date-fns/locale": "https://esm.sh/date-fns@^4.1.0/locale",
+    "date-fns/": "https://esm.sh/date-fns@^4.1.0/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
 </head>
-<body>
-  <div class="login-container">
-    <h2>Entrar com Google15</h2>
-    <button id="google-login">Login com Google</button>
-    <div id="user-info" style="display:none;">
-      <p id="user-name"></p>
-      <img id="user-photo" alt="Foto do usuário">
-      <button id="logout">Sair</button>
-    </div>
-  </div>
-
-  <!-- Firebase compat CDN -->
-  <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-auth-compat.js"></script>
-
-  <script>
-    // Firebase config
-    const firebaseConfig = {
-      apiKey: "AIzaSyBkLoi7cu_qLWiPTlHiNdh1-WpHIHrHCnA",
-      authDomain: "controle-financeiro-pess-64800.firebaseapp.com",
-      projectId: "controle-financeiro-pess-64800",
-      storageBucket: "controle-financeiro-pess-64800.firebasestorage.app",
-      messagingSenderId: "704824842865",
-      appId: "1:704824842865:web:2871181735530a720659d0"
-    };
-
-    // Inicializa Firebase
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const provider = new firebase.auth.GoogleAuthProvider();
-
-    // Seletores
-    const loginBtn = document.getElementById('google-login');
-    const logoutBtn = document.getElementById('logout');
-    const userInfo = document.getElementById('user-info');
-    const userName = document.getElementById('user-name');
-    const userPhoto = document.getElementById('user-photo');
-
-    // Login Google
-    loginBtn.addEventListener('click', () => {
-      auth.signInWithPopup(provider)
-        .then(res => console.log('Usuário logado:', res.user))
-        .catch(err => console.error(err));
-    });
-
-    // Logout
-    logoutBtn.addEventListener('click', () => {
-      auth.signOut()
-        .then(() => console.log('Usuário deslogado'))
-        .catch(err => console.error(err));
-    });
-
-    // Detecta login/logout
-    auth.onAuthStateChanged(user => {
-      if(user){
-        loginBtn.style.display = 'none';
-        userInfo.style.display = 'block';
-        userName.textContent = `Olá, ${user.displayName}`;
-        userPhoto.src = user.photoURL;
-      } else {
-        loginBtn.style.display = 'block';
-        userInfo.style.display = 'none';
-      }
-    });
-  </script>
+<body class="bg-slate-50 text-slate-900">
+    <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
 </body>
 </html>
