@@ -21,7 +21,10 @@ const TickerConfig: React.FC<{ user: UserProfile }> = ({ user }) => {
   useEffect(() => {
     if (!user?.uid) return;
     const unsub = db.collection('usuarios').doc(user.uid).collection('tickers')
-      .onSnapshot(snap => setTickers(snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Ticker))));
+      .onSnapshot(
+        snap => setTickers(snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Ticker))),
+        err => console.warn('Erro ao carregar tickers:', err)
+      );
     return unsub;
   }, [user.uid]);
 

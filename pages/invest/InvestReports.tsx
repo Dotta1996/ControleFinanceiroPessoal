@@ -29,7 +29,10 @@ const InvestReports: React.FC<{ user: UserProfile }> = ({ user }) => {
 
     // Busca tickers para o filtro
     const unsubTickers = db.collection('usuarios').doc(user.uid).collection('tickers')
-      .onSnapshot(snap => setTickers(snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Ticker))));
+      .onSnapshot(
+        snap => setTickers(snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Ticker))),
+        err => console.warn('Erro ao carregar tickers:', err)
+      );
 
     // Busca operações
     const unsubOps = dbService.listenCollection(user.uid, 'investimentos', (items) => {

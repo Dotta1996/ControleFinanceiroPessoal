@@ -23,14 +23,23 @@ const MonthlyTotals: React.FC<{ user: UserProfile }> = ({ user }) => {
 
     const unsubConfig = db.collection('usuarios').doc(user.uid).collection('configuracoes_matriz')
       .doc('layout_atual')
-      .onSnapshot(doc => {
-        if (doc.exists) setRows(doc.data()?.rows || []);
-        else setRows([{ category: '', subcategory: '' }]);
-        setLoadingConfig(false);
-      });
+      .onSnapshot(
+        doc => {
+          if (doc.exists) setRows(doc.data()?.rows || []);
+          else setRows([{ category: '', subcategory: '' }]);
+          setLoadingConfig(false);
+        },
+        err => {
+          console.warn('Erro ao carregar configurações da matriz:', err);
+          setLoadingConfig(false);
+        }
+      );
 
     const unsubCat = db.collection('usuarios').doc(user.uid).collection('categorias')
-      .onSnapshot(snap => setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category))));
+      .onSnapshot(
+        snap => setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category))),
+        err => console.warn('Erro ao carregar categorias:', err)
+      );
     
     const unsubTx = dbService.listenCollection(user.uid, 'transacoes', (items) => {
       const filtered = items.filter(t => t.year === year || dbService.getYearFromDate(t.date) === year.toString());

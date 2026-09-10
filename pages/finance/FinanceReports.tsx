@@ -19,8 +19,75 @@ import {
   Circle
 } from 'lucide-react';
 
+// Helpers para extração robusta de data e prevenção de desvios de fuso horário
+const parseTxDate = (dateVal: any): { year: number; month: number; day: number } | null => {
+  if (!dateVal) return null;
+  if (typeof dateVal === 'string') {
+    const trimmed = dateVal.trim();
+    // YYYY-MM-DD ou YYYY-MM-DDTHH:mm:ss
+    const ymd = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (ymd) {
+      return {
+        year: parseInt(ymd[1], 10),
+        month: parseInt(ymd[2], 10),
+        day: parseInt(ymd[3], 10)
+      };
+    }
+    // DD/MM/YYYY
+    const dmy = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (dmy) {
+      return {
+        day: parseInt(dmy[1], 10),
+        month: parseInt(dmy[2], 10),
+        year: parseInt(dmy[3], 10)
+      };
+    }
+    // Fallback com meio-dia para evitar deslocamento UTC
+    const d = new Date(trimmed.includes('T') ? trimmed : `${trimmed}T12:00:00`);
+    if (!isNaN(d.getTime())) {
+      return {
+        year: d.getFullYear(),
+        month: d.getMonth() + 1,
+        day: d.getDate()
+      };
+    }
+  }
+  if (dateVal instanceof Date && !isNaN(dateVal.getTime())) {
+    return {
+      year: dateVal.getFullYear(),
+      month: dateVal.getMonth() + 1,
+      day: dateVal.getDate()
+    };
+  }
+  return null;
+};
+
+const getTxDateInfo = (tx: Transaction): { year: number; month: number } => {
+  const parsed = parseTxDate(tx.date);
+  if (parsed) {
+    return { year: parsed.year, month: parsed.month };
+  }
+  const yearFromDate = parseInt(dbService.getYearFromDate(tx.date), 10);
+  const monthFromDate = dbService.getMonthFromDate(tx.date);
+  return {
+    year: Number(tx.year) || (!isNaN(yearFromDate) ? yearFromDate : new Date().getFullYear()),
+    month: Number(tx.month) || (!isNaN(monthFromDate) ? monthFromDate : (new Date().getMonth() + 1))
+  };
+};
+
+const formatDisplayDate = (dateVal: any): string => {
+  const parsed = parseTxDate(dateVal);
+  if (!parsed) {
+    return typeof dateVal === 'string' ? dateVal : '—';
+  }
+  const dd = String(parsed.day).padStart(2, '0');
+  const mm = String(parsed.month).padStart(2, '0');
+  const yyyy = String(parsed.year);
+  return `${dd}/${mm}/${yyyy}`;
+};
+
 const FinanceReports: React.FC<{ user: UserProfile }> = ({ user }) => {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -36,27 +103,61 @@ const FinanceReports: React.FC<{ user: UserProfile }> = ({ user }) => {
     if (!user?.uid) return;
 
     const unsubCat = db.collection('usuarios').doc(user.uid).collection('categorias')
-      .onSnapshot(snap => setCategories(snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Category))));
+      .onSnapshot(
+        snap => setCategories(snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Category))),
+        err => console.warn('Erro ao carregar categorias:', err)
+      );
 
     const unsubTx = dbService.listenCollection(user.uid, 'transacoes', (items) => {
-      const filtered = items.filter(tx => {
-        const yearMatch = year === 'all' || tx.year === year || dbService.getYearFromDate(tx.date) === year.toString();
-        const monthMatch = month === 'all' || tx.month === month || (new Date(tx.date).getMonth() + 1) === month;
-        return yearMatch && monthMatch;
-      });
-      setTransactions(filtered.sort((a, b) => b.date.localeCompare(a.date)));
+      setAllTransactions(items);
     });
 
     return () => { unsubCat(); unsubTx(); };
-  }, [user.uid, month, year]);
+  }, [user.uid]);
 
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter(tx => {
-      const catMatch = selectedCats.length === 0 || selectedCats.includes(tx.category);
-      const subMatch = selectedSubs.length === 0 || selectedSubs.includes(tx.subcategory);
-      return catMatch && subMatch;
+  // Lista dinâmica de anos disponíveis nos registros
+  const yearsList = useMemo(() => {
+    const years = new Set<number>();
+    years.add(new Date().getFullYear());
+    years.add(2024);
+    years.add(2025);
+    years.add(2026);
+    allTransactions.forEach(tx => {
+      const info = getTxDateInfo(tx);
+      if (info.year && !isNaN(info.year)) years.add(info.year);
     });
-  }, [transactions, selectedCats, selectedSubs]);
+    return Array.from(years).sort((a, b) => b - a);
+  }, [allTransactions]);
+
+  // Filtro estrito de Mês e Ano baseado na data real da transação
+  const periodTransactions = useMemo(() => {
+    return allTransactions.filter(tx => {
+      const info = getTxDateInfo(tx);
+      const yearMatch = year === 'all' || info.year === year;
+      const monthMatch = month === 'all' || info.month === month;
+      return yearMatch && monthMatch;
+    });
+  }, [allTransactions, year, month]);
+
+  // Filtro por categorias e subcategorias selecionadas
+  const filteredTransactions = useMemo(() => {
+    return periodTransactions
+      .filter(tx => {
+        const catMatch = selectedCats.length === 0 || selectedCats.includes(tx.category);
+        const subMatch = selectedSubs.length === 0 || selectedSubs.includes(tx.subcategory);
+        return catMatch && subMatch;
+      })
+      .sort((a, b) => {
+        const parsedA = parseTxDate(a.date);
+        const parsedB = parseTxDate(b.date);
+        if (parsedA && parsedB) {
+          const timeA = new Date(parsedA.year, parsedA.month - 1, parsedA.day).getTime();
+          const timeB = new Date(parsedB.year, parsedB.month - 1, parsedB.day).getTime();
+          return timeB - timeA;
+        }
+        return (b.date || '').localeCompare(a.date || '');
+      });
+  }, [periodTransactions, selectedCats, selectedSubs]);
 
   const availableSubcategories = useMemo(() => {
     if (selectedCats.length === 0) return [];
@@ -81,8 +182,8 @@ const FinanceReports: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   const togglePaid = async (tx: Transaction) => {
     if (!tx.id || !user?.uid) return;
-    const txYear = dbService.getYearFromDate(tx.date);
-    await dbService.updateItem(user.uid, 'transacoes', tx.id, txYear, { 
+    const txDocKey = dbService.getDocKey('transacoes', tx.date);
+    await dbService.updateItem(user.uid, 'transacoes', tx.id, txDocKey, { 
       isPaid: !tx.isPaid 
     });
   };
@@ -126,14 +227,14 @@ const FinanceReports: React.FC<{ user: UserProfile }> = ({ user }) => {
           <div className="flex items-center gap-2 px-3 border-r border-slate-100 group">
             <Calendar size={14} className="text-slate-400 group-hover:text-indigo-500 transition-colors" />
             <select className="bg-transparent font-black text-[10px] uppercase outline-none cursor-pointer py-1 text-slate-700" value={year} onChange={e => setYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}>
-              <option value="all">Anos</option>
-              {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+              <option value="all">Todos os Anos</option>
+              {yearsList.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
           <div className="flex items-center gap-2 px-3">
             <select className="bg-transparent font-black text-[10px] uppercase outline-none cursor-pointer py-1 text-slate-700" value={month} onChange={e => setMonth(e.target.value === 'all' ? 'all' : Number(e.target.value))}>
-              <option value="all">Meses</option>
-              {Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{new Date(0, i).toLocaleString('pt-BR', { month: 'long' })}</option>)}
+              <option value="all">Todos os Meses</option>
+              {Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{new Date(2025, i, 1).toLocaleString('pt-BR', { month: 'long' })}</option>)}
             </select>
           </div>
         </div>
@@ -192,7 +293,7 @@ const FinanceReports: React.FC<{ user: UserProfile }> = ({ user }) => {
                     <td className="p-6 text-center">
                       <button onClick={() => togglePaid(tx)} className={`p-2.5 rounded-2xl transition-all active:scale-90 border-2 ${tx.isPaid ? 'text-emerald-500 bg-emerald-50 border-emerald-100' : 'text-slate-200 bg-white border-slate-100 hover:text-indigo-400 hover:border-indigo-100'}`}><CheckCircle2 size={20} /></button>
                     </td>
-                    <td className="p-6 text-center whitespace-nowrap"><span className="text-[10px] font-black text-slate-400 tabular-nums uppercase">{tx.date.split('-').reverse().join('/')}</span></td>
+                    <td className="p-6 text-center whitespace-nowrap"><span className="text-[10px] font-black text-slate-400 tabular-nums uppercase">{formatDisplayDate(tx.date)}</span></td>
                     <td className="p-6"><div className="flex items-center gap-2"><Circle size={6} className={tx.type === 'income' ? 'text-emerald-500 fill-emerald-500' : 'text-rose-500 fill-rose-500'} /><span className="text-[12px] font-black text-slate-900 uppercase tracking-tight">{tx.category}</span></div></td>
                     <td className="p-6"><span className="text-[10px] font-bold text-indigo-500 uppercase tracking-tighter opacity-70">{tx.subcategory || '—'}</span></td>
                     <td className="p-6"><span className="text-[11px] font-bold text-slate-500 italic truncate block w-24" title={tx.description}>{tx.description || '—'}</span></td>
@@ -200,7 +301,7 @@ const FinanceReports: React.FC<{ user: UserProfile }> = ({ user }) => {
                     <td className="p-6 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <button onClick={() => handleEdit(tx)} className="p-2 text-slate-300 hover:text-indigo-600 transition-colors" title="Editar"><Edit3 size={16} /></button>
-                        <button onClick={() => { setDeleteId(tx.id!); setDeleteYear(dbService.getYearFromDate(tx.date)); }} className="p-2 text-slate-300 hover:text-rose-500 transition-colors" title="Excluir"><Trash2 size={16} /></button>
+                        <button onClick={() => { setDeleteId(tx.id!); setDeleteYear(dbService.getDocKey('transacoes', tx.date)); }} className="p-2 text-slate-300 hover:text-rose-500 transition-colors" title="Excluir"><Trash2 size={16} /></button>
                       </div>
                     </td>
                   </tr>

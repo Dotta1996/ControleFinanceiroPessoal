@@ -17,13 +17,16 @@ const CategoryConfig: React.FC<{ user: UserProfile }> = ({ user }) => {
   useEffect(() => {
     if (!user?.uid) return;
     const unsub = db.collection('usuarios').doc(user.uid).collection('categorias')
-      .onSnapshot(snap => {
-        const data = snap.docs.map(doc => ({ 
-          ...doc.data(), 
-          id: doc.id 
-        } as Category));
-        setCategories(data.sort((a, b) => a.name.localeCompare(b.name)));
-      });
+      .onSnapshot(
+        snap => {
+          const data = snap.docs.map(doc => ({ 
+            ...doc.data(), 
+            id: doc.id 
+          } as Category));
+          setCategories(data.sort((a, b) => a.name.localeCompare(b.name)));
+        },
+        err => console.warn('Erro ao carregar categorias:', err)
+      );
     return unsub;
   }, [user.uid]);
 

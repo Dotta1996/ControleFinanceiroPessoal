@@ -26,7 +26,10 @@ const InvestmentOperations: React.FC<{ user: UserProfile }> = ({ user }) => {
   useEffect(() => {
     if (!user?.uid) return;
     const unsubTickers = db.collection('usuarios').doc(user.uid).collection('tickers')
-      .onSnapshot(snap => setTickers(snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Ticker))));
+      .onSnapshot(
+        snap => setTickers(snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Ticker))),
+        err => console.warn('Erro ao carregar tickers:', err)
+      );
     
     const unsubOps = dbService.listenCollection(user.uid, 'investimentos', (items) => {
       const sorted = items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

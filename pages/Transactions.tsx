@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { UserProfile, Transaction, CATEGORIES } from '../types';
-import { Plus, Search, Trash2, Filter } from 'lucide-react';
+import { UserProfile, Transaction, Category, CATEGORIES } from '../types';
+import { Plus, Search, Trash2, Filter, Repeat } from 'lucide-react';
 import { format } from 'date-fns';
+import { RecurrentTransactionsModal } from '../components/RecurrentTransactionsModal';
 
 interface TransactionsProps {
   user: UserProfile;
@@ -11,7 +12,9 @@ interface TransactionsProps {
 
 const Transactions: React.FC<TransactionsProps> = ({ user }) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isRecurrentModalOpen, setIsRecurrentModalOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
 
@@ -30,7 +33,13 @@ const Transactions: React.FC<TransactionsProps> = ({ user }) => {
       .onSnapshot((snapshot) => {
         setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction)));
       });
-    return unsub;
+
+    const unsubCat = db.collection('usuarios').doc(user.uid).collection('categorias')
+      .onSnapshot((snapshot) => {
+        setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category)));
+      });
+
+    return () => { unsub(); unsubCat(); };
   }, [user.uid]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -76,13 +85,22 @@ const Transactions: React.FC<TransactionsProps> = ({ user }) => {
           <h2 className="text-2xl font-bold text-gray-900">Transações</h2>
           <p className="text-gray-500 text-sm">Gerencie suas entradas e saídas.</p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center space-x-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 transition-all shadow-md active:scale-95"
-        >
-          <Plus size={20} />
-          <span>Nova Transação</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsRecurrentModalOpen(true)}
+            className="flex items-center justify-center space-x-2 bg-indigo-50 border border-indigo-200 text-indigo-700 px-4 py-2.5 rounded-xl font-semibold hover:bg-indigo-100 transition-all shadow-sm active:scale-95 text-sm"
+          >
+            <Repeat size={18} />
+            <span>Itens Recorrentes</span>
+          </button>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center justify-center space-x-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 transition-all shadow-md active:scale-95 text-sm"
+          >
+            <Plus size={20} />
+            <span>Nova Transação</span>
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -243,6 +261,15 @@ const Transactions: React.FC<TransactionsProps> = ({ user }) => {
           </div>
         </div>
       )}
+
+      {/* Modal de Lançamentos Recorrentes e Fixos */}
+      <RecurrentTransactionsModal
+        isOpen={isRecurrentModalOpen}
+        onClose={() => setIsRecurrentModalOpen(false)}
+        user={user}
+        categories={categories}
+        allTransactions={transactions}
+      />
     </div>
   );
 };

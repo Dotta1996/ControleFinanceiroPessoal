@@ -1,5 +1,8 @@
 {
   "name": "Controle Financeiro e Investimentos",
   "description": "Uma plataforma completa para gerir suas finanças pessoais e carteira de investimentos com dashboards interativos e integração Firebase.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

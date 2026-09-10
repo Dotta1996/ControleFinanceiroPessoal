@@ -17,8 +17,10 @@ const FinanceDashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
     if (!user?.uid) return;
     const unsub = dbService.listenCollection(user.uid, 'transacoes', (items) => {
       const filtered = items.filter(t => {
-        const yearMatch = t.year === year || dbService.getYearFromDate(t.date) === year.toString();
-        const monthMatch = t.month === month || (new Date(t.date).getMonth() + 1) === month;
+        const itemYear = parseInt(dbService.getYearFromDate(t.date), 10);
+        const itemMonth = dbService.getMonthFromDate(t.date);
+        const yearMatch = itemYear === year || t.year === year;
+        const monthMatch = itemMonth === month;
         return yearMatch && monthMatch;
       });
       setTransactions(filtered);
@@ -26,9 +28,14 @@ const FinanceDashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
     return unsub;
   }, [user.uid, month, year]);
 
+  const isCartaoItens = (cat: string) => {
+    const normalized = (cat || '').trim().toLowerCase();
+    return normalized === 'cartão itens' || normalized === 'cartao itens';
+  };
+
   const totalReceitas = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
-  const totalDespesas = transactions.filter(t => t.type === 'expense' && t.category !== 'Cartão Itens').reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
-  const totalCartao = transactions.filter(t => t.category === 'Cartão').reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+  const totalDespesas = transactions.filter(t => t.type === 'expense' && !isCartaoItens(t.category)).reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+  const totalCartao = transactions.filter(t => t.category === 'Cartão' || t.category === 'Cartao').reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
   const saldoFinal = totalReceitas - totalDespesas;
 
   const barData = [
@@ -37,9 +44,9 @@ const FinanceDashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
   ];
 
   const pieData = Array.from(transactions
-    .filter(t => t.type === 'expense')
+    .filter(t => t.type === 'expense' && !isCartaoItens(t.category))
     .reduce((acc, t) => {
-      acc.set(t.category, (acc.get(t.category) || 0) + t.amount);
+      acc.set(t.category, (acc.get(t.category) || 0) + (Number(t.amount) || 0));
       return acc;
     }, new Map()).entries())
     .map(([name, value]) => ({ name, value }))

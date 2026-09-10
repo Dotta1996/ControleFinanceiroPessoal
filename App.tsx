@@ -36,20 +36,31 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
-      if (firebaseUser) {
-        // Busca dados adicionais do usuário no Firestore se necessário
-        const userDoc = await db.collection('usuarios').doc(firebaseUser.uid).get();
-        const userData: UserProfile = {
-          uid: firebaseUser.uid,
-          displayName: firebaseUser.displayName || userDoc.data()?.displayName || 'Usuário',
-          email: firebaseUser.email || '',
-          photoURL: firebaseUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${firebaseUser.email}`
-        };
-        setUser(userData);
-      } else {
+      try {
+        if (firebaseUser) {
+          // Busca dados adicionais do usuário no Firestore se necessário
+          let userDoc = null;
+          try {
+            userDoc = await db.collection('usuarios').doc(firebaseUser.uid).get();
+          } catch (docErr) {
+            console.warn('Não foi possível carregar dados adicionais do perfil:', docErr);
+          }
+          const userData: UserProfile = {
+            uid: firebaseUser.uid,
+            displayName: firebaseUser.displayName || userDoc?.data()?.displayName || 'Usuário',
+            email: firebaseUser.email || '',
+            photoURL: firebaseUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${firebaseUser.email}`
+          };
+          setUser(userData);
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        console.error('Erro no fluxo de autenticação:', err);
         setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();

@@ -9,7 +9,14 @@ export const dbService = {
   getYearFromDate: (date: any): string => {
     if (!date) return new Date().getFullYear().toString();
     if (typeof date === 'string') {
-      return date.split('-')[0];
+      const trimmed = date.trim();
+      const ymd = trimmed.match(/^(\d{4})/);
+      if (ymd) return ymd[1];
+      const dmy = trimmed.match(/\/(\d{4})/);
+      if (dmy) return dmy[1];
+      const d = new Date(trimmed.includes('T') ? trimmed : `${trimmed}T12:00:00`);
+      if (!isNaN(d.getTime())) return d.getFullYear().toString();
+      return trimmed.split('-')[0];
     }
     if (date instanceof Date) {
       return date.getFullYear().toString();
@@ -18,11 +25,52 @@ export const dbService = {
   },
 
   /**
-   * Salva um item em um documento anual
+   * Obtém o mês (1 a 12) a partir de uma data de forma imune a timezones
+   */
+  getMonthFromDate: (date: any): number => {
+    if (!date) return new Date().getMonth() + 1;
+    if (typeof date === 'string') {
+      const trimmed = date.trim();
+      const ymd = trimmed.match(/^\d{4}-(\d{1,2})/);
+      if (ymd) return parseInt(ymd[1], 10);
+      const dmy = trimmed.match(/^\d{1,2}\/(\d{1,2})/);
+      if (dmy) return parseInt(dmy[1], 10);
+      const d = new Date(trimmed.includes('T') ? trimmed : `${trimmed}T12:00:00`);
+      if (!isNaN(d.getTime())) return d.getMonth() + 1;
+    }
+    if (date instanceof Date) {
+      return date.getMonth() + 1;
+    }
+    return new Date().getMonth() + 1;
+  },
+
+  /**
+   * Obtém a chave mensal no formato YYYY-MM (ex: 2026-03)
+   */
+  getMonthKeyFromDate: (date: any): string => {
+    const year = dbService.getYearFromDate(date);
+    const month = String(dbService.getMonthFromDate(date)).padStart(2, '0');
+    return `${year}-${month}`;
+  },
+
+  /**
+   * Retorna a chave do documento de armazenamento:
+   * - 'transacoes': particionado mensalmente (ex: "2026-03") para manter documentos leves
+   * - demais coleções: particionadas anualmente (ex: "2026")
+   */
+  getDocKey: (collection: string, date: any): string => {
+    if (collection === 'transacoes') {
+      return dbService.getMonthKeyFromDate(date);
+    }
+    return dbService.getYearFromDate(date);
+  },
+
+  /**
+   * Salva um item em um documento (mensal para transações, anual para demais coleções)
    */
   saveItem: async (uid: string, collection: string, item: any) => {
-    const year = dbService.getYearFromDate(item.date);
-    const docRef = db.collection('usuarios').doc(uid).collection(collection).doc(year);
+    const docKey = dbService.getDocKey(collection, item.date);
+    const docRef = db.collection('usuarios').doc(uid).collection(collection).doc(docKey);
     
     const newItem = { 
       ...item, 
@@ -38,74 +86,125 @@ export const dbService = {
   },
 
   /**
-   * Salva múltiplos itens (batch) em documentos anuais
+   * Salva múltiplos itens (batch) particionados adequadamente
    */
   saveItems: async (uid: string, collection: string, items: any[]) => {
-    const byYear: Record<string, any[]> = {};
+    const byKey: Record<string, any[]> = {};
     items.forEach(item => {
-      const year = dbService.getYearFromDate(item.date);
-      if (!byYear[year]) byYear[year] = [];
+      const docKey = dbService.getDocKey(collection, item.date);
+      if (!byKey[docKey]) byKey[docKey] = [];
       const newItem = { 
         ...item, 
         id: item.id || Math.random().toString(36).substr(2, 9) + Date.now().toString(36),
         createdAt: item.createdAt || new Date().toISOString()
       };
-      byYear[year].push(newItem);
+      byKey[docKey].push(newItem);
     });
 
-    for (const year in byYear) {
-      const docRef = db.collection('usuarios').doc(uid).collection(collection).doc(year);
+    for (const docKey in byKey) {
+      const docRef = db.collection('usuarios').doc(uid).collection(collection).doc(docKey);
       await docRef.set({
-        items: firebase.firestore.FieldValue.arrayUnion(...byYear[year])
+        items: firebase.firestore.FieldValue.arrayUnion(...byKey[docKey])
       }, { merge: true });
     }
   },
 
   /**
-   * Atualiza um item em um documento anual
+   * Atualiza um item com suporte a mudança de documento (mês ou ano)
    */
-  updateItem: async (uid: string, collection: string, itemId: string, year: string, updatedData: any) => {
-    const docRef = db.collection('usuarios').doc(uid).collection(collection).doc(year);
-    const doc = await docRef.get();
-    
-    if (doc.exists) {
-      const items = doc.data()?.items || [];
+  updateItem: async (uid: string, collection: string, itemId: string, docKeyHint: string, updatedData: any) => {
+    const colRef = db.collection('usuarios').doc(uid).collection(collection);
+    let targetDocRef: firebase.firestore.DocumentReference | null = null;
+    let oldItem: any = null;
+
+    // 1. Tentar localizar direto pelo hint (pode ser "2026-03" ou "2026")
+    if (docKeyHint) {
+      const hintRef = colRef.doc(docKeyHint);
+      const hintSnap = await hintRef.get();
+      if (hintSnap.exists) {
+        const items = hintSnap.data()?.items || [];
+        const found = items.find((i: any) => i.id === itemId);
+        if (found) {
+          targetDocRef = hintRef;
+          oldItem = found;
+        }
+      }
+    }
+
+    // 2. Se não encontrou pelo hint, procurar em todos os docs da coleção
+    if (!oldItem) {
+      const snap = await colRef.get();
+      for (const doc of snap.docs) {
+        const items = doc.data()?.items || [];
+        const found = items.find((i: any) => i.id === itemId);
+        if (found) {
+          targetDocRef = doc.ref;
+          oldItem = found;
+          break;
+        }
+      }
+    }
+
+    if (!oldItem || !targetDocRef) {
+      // Se não encontrou o item anterior, salva como novo
+      await dbService.saveItem(uid, collection, { id: itemId, ...updatedData });
+      return;
+    }
+
+    const newDocKey = dbService.getDocKey(collection, updatedData.date || oldItem.date);
+    const isSameDoc = targetDocRef.id === newDocKey;
+
+    if (!isSameDoc) {
+      // Remove do documento antigo
+      await targetDocRef.update({
+        items: firebase.firestore.FieldValue.arrayRemove(oldItem)
+      });
+      // Adiciona no novo documento mensal/anual
+      await dbService.saveItem(uid, collection, { ...oldItem, ...updatedData });
+    } else {
+      // Atualiza dentro do mesmo documento
+      const docSnap = await targetDocRef.get();
+      const items = docSnap.data()?.items || [];
       const index = items.findIndex((i: any) => i.id === itemId);
       if (index !== -1) {
-        const oldItem = items[index];
-        const newYear = dbService.getYearFromDate(updatedData.date);
-        
-        if (newYear !== year) {
-          // Remover do ano antigo
-          await docRef.update({
-            items: firebase.firestore.FieldValue.arrayRemove(oldItem)
-          });
-          // Adicionar ao novo ano
-          await dbService.saveItem(uid, collection, { ...oldItem, ...updatedData });
-        } else {
-          // Atualizar no mesmo ano
-          const updatedItem = { ...oldItem, ...updatedData };
-          items[index] = updatedItem;
-          await docRef.update({ items });
-        }
+        items[index] = { ...oldItem, ...updatedData };
+        await targetDocRef.update({ items });
       }
     }
   },
 
   /**
-   * Exclui um item de um documento anual
+   * Exclui um item de um documento com suporte a chave mensal ou anual
    */
-  deleteItem: async (uid: string, collection: string, itemId: string, year: string) => {
-    const docRef = db.collection('usuarios').doc(uid).collection(collection).doc(year);
-    const doc = await docRef.get();
-    
-    if (doc.exists) {
+  deleteItem: async (uid: string, collection: string, itemId: string, docKeyHint?: string) => {
+    const colRef = db.collection('usuarios').doc(uid).collection(collection);
+
+    // 1. Tentar direto pelo hint
+    if (docKeyHint) {
+      const hintRef = colRef.doc(docKeyHint);
+      const hintSnap = await hintRef.get();
+      if (hintSnap.exists) {
+        const items = hintSnap.data()?.items || [];
+        const itemToDelete = items.find((i: any) => i.id === itemId);
+        if (itemToDelete) {
+          await hintRef.update({
+            items: firebase.firestore.FieldValue.arrayRemove(itemToDelete)
+          });
+          return;
+        }
+      }
+    }
+
+    // 2. Se não achou pelo hint, procurar em todos os documentos da coleção
+    const snap = await colRef.get();
+    for (const doc of snap.docs) {
       const items = doc.data()?.items || [];
       const itemToDelete = items.find((i: any) => i.id === itemId);
       if (itemToDelete) {
-        await docRef.update({
+        await doc.ref.update({
           items: firebase.firestore.FieldValue.arrayRemove(itemToDelete)
         });
+        return;
       }
     }
   },
@@ -124,6 +223,9 @@ export const dbService = {
           }
         });
         callback(allItems);
+      }, (err) => {
+        console.warn(`Erro ao escutar coleção ${collection}:`, err);
+        callback([]);
       });
   },
 

@@ -35,7 +35,10 @@ const InvestDashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
     });
     
     const unsubTick = db.collection('usuarios').doc(user.uid).collection('tickers')
-      .onSnapshot(snap => setTickers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Ticker))));
+      .onSnapshot(
+        snap => setTickers(snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Ticker))),
+        err => console.warn('Erro ao carregar tickers:', err)
+      );
 
     const unsubAportes = dbService.listenCollection(user.uid, 'aportes', (items) => {
       setAportes(items);
@@ -68,122 +71,65 @@ const InvestDashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
   const clearAllTickers = () => setVisibleTickers([]);
 
   const syncPrices = async () => {
-    if (tickers.length === 0 || !user?.uid) return;
+    if (!user?.uid) return;
+
+    let targetTickers = tickers;
+    if (targetTickers.length === 0) {
+      try {
+        const snap = await db.collection('usuarios').doc(user.uid).collection('tickers').get();
+        targetTickers = snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Ticker));
+        setTickers(targetTickers);
+      } catch (err) {
+        console.error('Erro ao buscar tickers:', err);
+      }
+    }
+
+    if (targetTickers.length === 0) {
+      alert('Nenhum ativo cadastrado para atualizar as cotações.');
+      return;
+    }
     
     setIsSyncing(true);
-    setSyncProgress({ current: 0, total: tickers.length });
+    setSyncProgress({ current: 0, total: targetTickers.length });
     
-    const DELAY_MS = 500; // 500ms entre requisições para não sobrecarregar
     let updatedTotal = 0;
     const failedTickers: string[] = [];
-    const BRAPI_BASE = 'https://brapi.dev/api/quote';
+    const apiKey = import.meta.env.VITE_BRAPI_API_KEY || '9ohxymKokgmQcyvkFTnhkx';
 
     try {
-      // Processar cada ticker sequencialmente
-      for (let i = 0; i < tickers.length; i++) {
-        const ticker = tickers[i];
-        
+      for (let i = 0; i < targetTickers.length; i++) {
+        const ticker = targetTickers[i];
+        setSyncProgress({ current: i + 1, total: targetTickers.length });
+
         try {
-            const apiKey = import.meta.env.VITE_BRAPI_API_KEY;
-            const response = await fetch(`${BRAPI_BASE}/${ticker.symbol}?fundamental=false&dividends=false`, {
-              headers: {
-                'Authorization': `Bearer ${apiKey}`
-              }
-            });
-          
-          if (!response.ok) {
-            console.warn(`⚠️ Ticker ${ticker.symbol}: Erro HTTP ${response.status}`);
-            failedTickers.push(ticker.symbol);
-            setSyncProgress(p => ({ ...p, current: i + 1 }));
+          const cleanSymbol = ticker.symbol ? ticker.symbol.trim().toUpperCase() : '';
+          if (!cleanSymbol || !ticker.id) {
+            failedTickers.push(ticker.symbol || 'Sem símbolo');
             continue;
           }
 
-          const data = await response.json();
-          
-          if (!data.results || data.results.length === 0) {
-            console.warn(`⚠️ Ticker ${ticker.symbol}: Sem dados retornados`);
-            failedTickers.push(ticker.symbol);
-            setSyncProgress(p => ({ ...p, current: i + 1 }));
-            continue;
-          }
+          const response = await fetch(`https://brapi.dev/api/quote/${cleanSymbol}?fundamental=false&dividends=false`, {
+            headers: { 'Authorization': `Bearer ${apiKey}` }
+          });
 
-          const result = data.results[0];
-
-          // Tentar múltiplas propriedades que podem conter o preço
-          let price: any = result.regularMarketPrice ?? result.lastPrice ?? result.close ?? result.price ?? result.lastTradePrice ?? result.regularMarketPreviousClose ?? result.previousClose ?? null;
-
-          // Se veio como string, tentar parsear (substituir vírgula por ponto)
-          if (typeof price === 'string' && price.trim() !== '') {
-            const parsed = parseFloat(price.replace(/,/g, '.'));
-            if (!isNaN(parsed)) price = parsed;
-          }
-
-          // Se preço inválido, tentar buscar por variantes do símbolo (.SA e troca de sufixo 3<->11)
-          if (!price || typeof price !== 'number' || !isFinite(price)) {
-            console.warn(`⚠️ Ticker ${ticker.symbol}: Preço inválido na primeira requisição. Tentando variantes de símbolo`);
-            const candidates: string[] = [];
-            candidates.push(`${ticker.symbol}.SA`);
-
-            // Tentar swap de sufixo comum 3 <-> 11 (ex: BBAS3 <-> BBAS11)
-            const m = ticker.symbol.match(/(.*?)(\d+)$/);
-            if (m) {
-              const base = m[1];
-              const num = m[2];
-              if (num === '3') candidates.push(`${base}11`, `${base}11.SA`);
-              else if (num === '11') candidates.push(`${base}3`, `${base}3.SA`);
-            }
-
-            // Garantir uppercase e uniquify
-            const uniq = Array.from(new Set(candidates.map(s => s.toUpperCase())));
-
-            for (const cand of uniq) {
-              try {
-                const altResp = await fetch(`${BRAPI_BASE}/${cand}?fundamental=false&dividends=false`, {
-                  headers: { 'Authorization': `Bearer ${apiKey}` }
-                });
-                if (!altResp.ok) {
-                  console.warn(`⚠️ Variante ${cand}: Erro HTTP ${altResp.status}`);
-                  continue;
-                }
-                const altData = await altResp.json();
-                if (!altData.results || altData.results.length === 0) continue;
-                const alt = altData.results[0];
-                let altPrice: any = alt.regularMarketPrice ?? alt.lastPrice ?? alt.close ?? alt.price ?? null;
-                if (typeof altPrice === 'string') altPrice = parseFloat(altPrice.replace(/,/g, '.'));
-                if (altPrice && typeof altPrice === 'number' && isFinite(altPrice) && altPrice > 0) {
-                  price = altPrice;
-
-                  break;
-                }
-              } catch (altErr: any) {
-                console.warn(`Tentativa variante ${cand} falhou para ${ticker.symbol}:`, altErr?.message || altErr);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.results && data.results.length > 0) {
+              const result = data.results[0];
+              let price: any = result.regularMarketPrice ?? result.lastPrice ?? result.close ?? null;
+              if (typeof price === 'string') price = parseFloat(price.replace(/,/g, '.'));
+              
+              if (price && typeof price === 'number' && isFinite(price)) {
+                await db.collection('usuarios').doc(user.uid).collection('tickers').doc(ticker.id).update({ lastPrice: price });
+                updatedTotal++;
+                continue;
               }
             }
           }
-
-          if (!price || typeof price !== 'number' || !isFinite(price)) {
-            console.warn(`⚠️ Ticker ${ticker.symbol}: Preço inválido após tentativas. Resposta:`, result);
-            failedTickers.push(ticker.symbol);
-            setSyncProgress(p => ({ ...p, current: i + 1 }));
-            continue;
-          }
-
-          // Atualizar no Firebase
-          const ref = db.collection('usuarios').doc(user.uid).collection('tickers').doc(ticker.id!);
-          await ref.update({ lastPrice: price });
-          
-          updatedTotal++;
-          
-          setSyncProgress(p => ({ ...p, current: i + 1 }));
-          
-          // Aguardar antes da próxima requisição
-          if (i < tickers.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, DELAY_MS));
-          }
-        } catch (tickerErr: any) {
-          console.error(`❌ Ticker ${ticker.symbol} falhou:`, tickerErr?.message || tickerErr);
           failedTickers.push(ticker.symbol);
-          setSyncProgress(p => ({ ...p, current: i + 1 }));
+        } catch (tickerErr: any) {
+          console.error(`Erro ao atualizar ${ticker.symbol}:`, tickerErr);
+          failedTickers.push(ticker.symbol);
         }
       }
       
@@ -195,10 +141,10 @@ const InvestDashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
       }
       
       // Mostrar modal de resultado
-      setSyncResultModal({ updated: updatedTotal, total: tickers.length, failed: failedTickers });
+      setSyncResultModal({ updated: updatedTotal, total: targetTickers.length, failed: failedTickers });
     } catch (error: any) {
       console.error('Erro geral ao sincronizar cotações:', error);
-      setSyncResultModal({ updated: 0, total: tickers.length, failed: tickers.map(t => t.symbol) });
+      setSyncResultModal({ updated: 0, total: targetTickers.length, failed: targetTickers.map(t => t.symbol) });
     } finally {
       setIsSyncing(false);
       setSyncProgress({ current: 0, total: 0 });

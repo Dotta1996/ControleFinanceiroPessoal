@@ -37,9 +37,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   }, [user.uid, currentYear]);
 
   const statsYTD = useMemo(() => {
+    const isCartaoItens = (cat: string) => {
+      const normalized = (cat || '').trim().toLowerCase();
+      return normalized === 'cartão itens' || normalized === 'cartao itens';
+    };
+
     const revenue = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
-    const expenses = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
-    const cardSpend = transactions.filter(t => t.category === 'Cartão' || t.category === 'Cartão Itens').reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+    const expenses = transactions.filter(t => t.type === 'expense' && !isCartaoItens(t.category)).reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+    const cardSpend = transactions.filter(t => t.category === 'Cartão' || t.category === 'Cartao').reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
     
     const ytdInvestOps = investOps.filter(op => {
       const opDate = new Date(op.date + 'T12:00:00');
@@ -53,7 +58,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   }, [transactions, investOps, currentYear]);
 
   const expenseByCategory = transactions
-    .filter(t => t.type === 'expense')
+    .filter(t => {
+      const normalized = (t.category || '').trim().toLowerCase();
+      return t.type === 'expense' && normalized !== 'cartão itens' && normalized !== 'cartao itens';
+    })
     .reduce((acc: any[], curr) => {
       const existing = acc.find(a => a.name === curr.category);
       if (existing) existing.value += (Number(curr.amount) || 0);

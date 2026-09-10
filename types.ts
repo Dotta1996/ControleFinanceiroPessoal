@@ -1,5 +1,21 @@
 
 export type TransactionType = 'income' | 'expense';
+export type ValueType = 'fixed' | 'percentage';
+export type PercentageBase = 'income' | 'expense';
+
+export interface RecurrentItem {
+  id?: string;
+  description: string;
+  type: TransactionType;
+  category: string;
+  subcategory?: string;
+  valueType: ValueType;
+  fixedAmount?: number;
+  percentage?: number;
+  percentageBase?: PercentageBase;
+  active: boolean;
+  createdAt?: any;
+}
 
 export interface Category {
   id?: string;

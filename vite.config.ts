@@ -9,11 +9,18 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        allowedHosts: true,
+      },
+      build: {
+        chunkSizeWarningLimit: 3000,
       },
       plugins: [
         react(),
         VitePWA({
           registerType: 'autoUpdate',
+          workbox: {
+            maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+          },
           manifest: {
             name: 'Controle Financeiro',
             short_name: 'Controle Financeiro',

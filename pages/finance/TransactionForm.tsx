@@ -4,16 +4,19 @@ import { useLocation } from 'react-router-dom';
 import { db } from '../../firebase';
 import { dbService } from '../../services/dbService';
 import { UserProfile, Transaction, Category } from '../../types';
-import { Plus, Trash2, Tag, Layers, Edit3, X, DollarSign, Loader2, List, Calendar, FileText, AlertTriangle, Hash } from 'lucide-react';
+import { Plus, Trash2, Tag, Layers, Edit3, X, DollarSign, Loader2, List, Calendar, FileText, AlertTriangle, Hash, Repeat, Sparkles } from 'lucide-react';
 import { format, addMonths, parseISO, isValid } from 'date-fns';
+import { RecurrentTransactionsModal } from '../../components/RecurrentTransactionsModal';
 
 const TransactionForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteYear, setDeleteYear] = useState<string | null>(null);
+  const [isRecurrentModalOpen, setIsRecurrentModalOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     description: '',
@@ -28,12 +31,16 @@ const TransactionForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     if (!user?.uid) return;
 
     const unsubCat = db.collection('usuarios').doc(user.uid).collection('categorias')
-      .onSnapshot(snap => {
-        setCategories(snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Category)));
-      });
+      .onSnapshot(
+        snap => {
+          setCategories(snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Category)));
+        },
+        err => console.warn('Erro ao carregar categorias:', err)
+      );
     
     const unsubTx = dbService.listenCollection(user.uid, 'transacoes', (items) => {
-      const sorted = items.sort((a, b) => {
+      setAllTransactions(items);
+      const sorted = [...items].sort((a, b) => {
         try {
           const ta = a.createdAt ? Date.parse(a.createdAt) : (a.date ? parseISO(a.date).getTime() : 0);
           const tb = b.createdAt ? Date.parse(b.createdAt) : (b.date ? parseISO(b.date).getTime() : 0);
@@ -147,11 +154,11 @@ const TransactionForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       if (!isValid(baseDate)) throw new Error("Data inválida");
 
       if (editingId) {
-        // Para edição, precisamos do ano original
+        // Para edição, localizamos a chave original do documento
         const originalTx = transactions.find(t => t.id === editingId);
-        const originalYear = originalTx ? dbService.getYearFromDate(originalTx.date) : dbService.getYearFromDate(formData.date);
+        const originalDocKey = originalTx ? dbService.getDocKey('transacoes', originalTx.date) : dbService.getDocKey('transacoes', formData.date);
         
-        await dbService.updateItem(user.uid, 'transacoes', editingId, originalYear, {
+        await dbService.updateItem(user.uid, 'transacoes', editingId, originalDocKey, {
           description: formData.description,
           amount: amountVal,
           category: formData.category,
@@ -194,14 +201,28 @@ const TransactionForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   return (
     <div className="p-4 md:p-10 max-w-5xl mx-auto space-y-10 animate-in fade-in duration-300 pb-24 relative">
-      <header className="flex items-center gap-4">
-        <div className="bg-slate-900 p-3 rounded-2xl text-white shadow-lg">
-          <List size={24} />
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="bg-slate-900 p-3 rounded-2xl text-white shadow-lg">
+            <List size={24} />
+          </div>
+          <div>
+            <h2 className="text-3xl font-black text-slate-900 tracking-tighter">{editingId ? 'Editar Registro' : 'Lançar Transação'}</h2>
+            <p className="text-xs text-slate-400 font-semibold mt-0.5">Registre transações avulsas ou utilize o lançamento de itens recorrentes mensais</p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tighter">{editingId ? 'Editar Registro' : 'Lançar Transação'}</h2>
-         
-        </div>
+
+        <button
+          type="button"
+          onClick={() => setIsRecurrentModalOpen(true)}
+          className="flex items-center justify-center gap-2.5 px-5 py-3 bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 hover:from-indigo-700 hover:to-violet-800 text-white font-black text-sm rounded-2xl shadow-lg shadow-indigo-500/25 transition-all active:scale-95 group self-start sm:self-auto cursor-pointer"
+        >
+          <Repeat size={18} className="group-hover:rotate-180 transition-transform duration-500" />
+          <span>Lançamento Recorrente</span>
+          <span className="bg-white/20 text-white text-[10px] uppercase font-black px-2 py-0.5 rounded-full ml-0.5">
+            Mensal
+          </span>
+        </button>
       </header>
 
       <div className={`bg-white p-6 md:p-10 rounded-[2.5rem] border-2 shadow-sm transition-all ${editingId ? 'border-indigo-500 ring-8 ring-indigo-50' : 'border-slate-200'}`}>
@@ -339,7 +360,7 @@ const TransactionForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                       <td className="p-3 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <button onClick={() => handleEdit(tx)} className="p-2 text-slate-300 hover:text-indigo-600 transition-colors" title="Editar"><Edit3 size={16} /></button>
-                          <button onClick={() => { setDeleteId(tx.id!); setDeleteYear(dbService.getYearFromDate(tx.date)); }} className="p-2 text-slate-300 hover:text-rose-500 transition-colors" title="Excluir"><Trash2 size={16} /></button>
+                          <button onClick={() => { setDeleteId(tx.id!); setDeleteYear(dbService.getDocKey('transacoes', tx.date)); }} className="p-2 text-slate-300 hover:text-rose-500 transition-colors" title="Excluir"><Trash2 size={16} /></button>
                         </div>
                       </td>
                     </tr>
@@ -381,6 +402,15 @@ const TransactionForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         </div>
       )}
+
+      {/* Modal de Lançamentos Recorrentes e Fixos */}
+      <RecurrentTransactionsModal
+        isOpen={isRecurrentModalOpen}
+        onClose={() => setIsRecurrentModalOpen(false)}
+        user={user}
+        categories={categories}
+        allTransactions={allTransactions}
+      />
     </div>
   );
 };
