@@ -22,7 +22,9 @@ import {
   HelpCircle,
   Save,
   RotateCcw,
-  Sparkles
+  Sparkles,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -48,6 +50,7 @@ export const RecurrentTransactionsModal: React.FC<RecurrentTransactionsModalProp
   const [savingItem, setSavingItem] = useState(false);
   const [confirmingLaunch, setConfirmingLaunch] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
 
   // Data de lançamento das transações geradas
   const [launchDate, setLaunchDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -82,6 +85,9 @@ export const RecurrentTransactionsModal: React.FC<RecurrentTransactionsModalProp
           // Ordena: receitas primeiro ou por data/descrição
           items.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
           setRecurrentItems(items);
+          if (items.length === 0) {
+            setIsFormOpen(true);
+          }
           setLoading(false);
         },
         (error) => {
@@ -92,6 +98,16 @@ export const RecurrentTransactionsModal: React.FC<RecurrentTransactionsModalProp
 
     return () => unsub();
   }, [user.uid, isOpen]);
+
+  // Fechar com a tecla ESC
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   // Extrai ano e mês da data de lançamento
   const { launchYear, launchMonth } = useMemo(() => {
@@ -209,11 +225,15 @@ export const RecurrentTransactionsModal: React.FC<RecurrentTransactionsModalProp
     if (availableCategories.length > 0) {
       setFormCategory(availableCategories[0].name);
     }
+    if (recurrentItems.length > 0) {
+      setIsFormOpen(false);
+    }
   };
 
   // Carregar item para edição
   const handleEditItem = (item: RecurrentItem) => {
     setEditingId(item.id || null);
+    setIsFormOpen(true);
     setFormType(item.type);
     setFormDescription(item.description);
     setFormCategory(item.category);
@@ -356,137 +376,173 @@ export const RecurrentTransactionsModal: React.FC<RecurrentTransactionsModalProp
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-5xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col my-auto max-h-[92vh]">
+    <div 
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm p-3 sm:p-6 flex justify-center items-start sm:items-center animate-in fade-in duration-200"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="bg-white w-full max-w-5xl rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-auto flex flex-col">
         
-        {/* Header */}
-        <div className="px-6 py-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-indigo-600/30 border border-indigo-400/30 rounded-2xl text-indigo-400">
-              <Repeat size={22} className="animate-spin-slow" />
+        {/* Banner Superior (Header) */}
+        <div className="px-4 py-4 sm:px-6 sm:py-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-600/30 border border-indigo-400/30 flex items-center justify-center text-indigo-400 shrink-0">
+              <Repeat size={20} />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg sm:text-xl font-black tracking-tight text-white">Lançamentos Recorrentes & Fixos</h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h3 className="text-base sm:text-lg md:text-xl font-black tracking-tight text-white">
+                  Lançamentos Recorrentes & Fixos
+                </h3>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                   Mensal Automático
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-400 mt-1 line-clamp-2 sm:line-clamp-none">
                 Cadastre despesas fixas, caixinhas, investimentos e receitas. Configure uma vez e lance todos os meses com 1 clique.
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-all"
-            title="Fechar"
+            className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-all ml-2 shrink-0"
+            title="Fechar (ESC)"
           >
             <X size={20} />
           </button>
         </div>
 
-        {/* Content Body - Scrollable */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+        {/* Content Body - Espaço amplo e fluido com scroll natural */}
+        <div className="p-4 sm:p-6 space-y-5 sm:space-y-6">
 
           {/* Painel de Configuração do Mês de Lançamento */}
-          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 sm:p-5">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-                  <Calendar size={12} /> Data do Lançamento
+          <div className="bg-slate-50 border border-slate-200/80 rounded-xl sm:rounded-2xl p-2.5 sm:p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                  <Calendar size={12} /> Data:
                 </span>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="date"
-                    value={launchDate}
-                    onChange={(e) => setLaunchDate(e.target.value)}
-                    className="px-3.5 py-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-800 text-sm shadow-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <div className="text-xs font-semibold text-slate-500">
-                    Mês de competência: <strong className="text-slate-800">{String(launchMonth).padStart(2, '0')}/{launchYear}</strong>
-                  </div>
+                <input
+                  type="date"
+                  value={launchDate}
+                  onChange={(e) => setLaunchDate(e.target.value)}
+                  className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg font-bold text-slate-800 text-xs sm:text-sm shadow-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <div className="text-xs font-semibold text-slate-500">
+                  Competência: <strong className="text-slate-800">{String(launchMonth).padStart(2, '0')}/{launchYear}</strong>
                 </div>
               </div>
 
               {/* Informações da Base do Mês (Para cálculo das porcentagens) */}
-              <div className="flex flex-wrap items-center gap-3 sm:gap-4 bg-white p-3 rounded-xl border border-slate-200/80 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                  <span className="text-slate-500 font-medium">Receita apurada no mês:</span>
-                  <strong className="text-emerald-700 font-black">
+              <div className="flex items-center gap-2 sm:gap-3 bg-white px-2.5 py-1.5 sm:p-2 rounded-xl border border-slate-200/80 text-[11px] sm:text-xs flex-wrap justify-between sm:justify-start">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span className="text-slate-500 font-medium">Receitas:</span>
+                  <strong className="text-emerald-700 font-bold">
                     R$ {monthCalculatedIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </strong>
                 </div>
 
-                <div className="h-4 w-px bg-slate-200 hidden sm:block"></div>
+                <div className="h-3.5 w-px bg-slate-200"></div>
 
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
-                  <span className="text-slate-500 font-medium">Despesas apuradas:</span>
-                  <strong className="text-rose-700 font-black">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                  <span className="text-slate-500 font-medium">Despesas:</span>
+                  <strong className="text-rose-700 font-bold">
                     R$ {monthCalculatedExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </strong>
                 </div>
-
-                {/* Opção para ajustar receita base manual caso ainda não tenha receita lançada no mês */}
-                <div className="w-full sm:w-auto flex items-center gap-2 pt-2 sm:pt-0 sm:border-l sm:pl-4 border-slate-200">
-                  <label className="flex items-center gap-1.5 cursor-pointer text-slate-600 select-none">
-                    <input
-                      type="checkbox"
-                      checked={useManualIncome}
-                      onChange={(e) => setUseManualIncome(e.target.checked)}
-                      className="rounded text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <span className="text-[11px] font-semibold">Simular base de receita:</span>
-                  </label>
-                  {useManualIncome && (
-                    <div className="relative w-28">
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">R$</span>
-                      <input
-                        type="text"
-                        placeholder="0,00"
-                        value={manualIncomeBase}
-                        onChange={(e) => {
-                          let val = e.target.value.replace(/\D/g, "");
-                          if (!val) setManualIncomeBase("");
-                          else {
-                            const num = parseInt(val, 10) / 100;
-                            setManualIncomeBase(num.toLocaleString('pt-BR', { minimumFractionDigits: 2 }));
-                          }
-                        }}
-                        className="w-full pl-6 pr-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-indigo-500"
-                      />
-                    </div>
-                  )}
-                </div>
               </div>
+            </div>
+
+            {/* Opção para ajustar receita base manual caso ainda não tenha receita lançada no mês */}
+            <div className="mt-2 pt-2 border-t border-slate-200/60 flex items-center gap-2 flex-wrap text-xs">
+              <label className="flex items-center gap-1.5 cursor-pointer text-slate-600 select-none">
+                <input
+                  type="checkbox"
+                  checked={useManualIncome}
+                  onChange={(e) => setUseManualIncome(e.target.checked)}
+                  className="rounded text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-[11px] font-semibold">Simular base de receita diferente:</span>
+              </label>
+              {useManualIncome && (
+                <div className="relative w-28">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">R$</span>
+                  <input
+                    type="text"
+                    placeholder="0,00"
+                    value={manualIncomeBase}
+                    onChange={(e) => {
+                      let val = e.target.value.replace(/\D/g, "");
+                      if (!val) setManualIncomeBase("");
+                      else {
+                        const num = parseInt(val, 10) / 100;
+                        setManualIncomeBase(num.toLocaleString('pt-BR', { minimumFractionDigits: 2 }));
+                      }
+                    }}
+                    className="w-full pl-6 pr-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-indigo-500"
+                  />
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Form de Cadastro / Edição de Item Recorrente */}
-          <div className="bg-white border-2 border-indigo-100 rounded-2xl p-4 sm:p-6 shadow-sm relative">
-            <div className="flex items-center justify-between mb-4">
+          {/* Form de Cadastro / Edição de Item Recorrente (Colapsável para economizar espaço em telas pequenas) */}
+          <div className="bg-white border border-indigo-100 rounded-xl sm:rounded-2xl shadow-sm overflow-hidden">
+            <div 
+              onClick={() => setIsFormOpen(prev => !prev)}
+              className="p-3 sm:p-4 bg-indigo-50/40 hover:bg-indigo-50/70 transition-colors cursor-pointer flex items-center justify-between"
+            >
               <div className="flex items-center gap-2">
-                <span className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
-                  {editingId ? <Edit3 size={16} /> : <Plus size={16} />}
+                <span className="p-1 sm:p-1.5 bg-indigo-100 text-indigo-600 rounded-lg">
+                  {editingId ? <Edit3 size={14} /> : <Plus size={14} />}
                 </span>
-                <h4 className="font-bold text-slate-900 text-sm sm:text-base">
-                  {editingId ? 'Editar Item Recorrente' : 'Cadastrar Novo Item Recorrente'}
-                </h4>
+                <div>
+                  <h4 className="font-bold text-slate-900 text-xs sm:text-sm">
+                    {editingId ? 'Editando Item Recorrente' : 'Cadastrar Novo Item Recorrente'}
+                  </h4>
+                  {!isFormOpen && (
+                    <p className="text-[10px] sm:text-xs text-slate-400">Clique para expandir e cadastrar novo item</p>
+                  )}
+                </div>
               </div>
-              {editingId && (
+              <div className="flex items-center gap-2">
+                {editingId && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      resetForm();
+                    }}
+                    className="text-[11px] text-rose-600 hover:text-rose-700 font-bold px-2 py-1 rounded bg-rose-50 border border-rose-200"
+                  >
+                    Cancelar edição
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={resetForm}
-                  className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 font-semibold"
+                  className="text-xs text-indigo-600 font-bold px-2.5 py-1 rounded-lg bg-indigo-100/70 hover:bg-indigo-100 flex items-center gap-1"
                 >
-                  <RotateCcw size={12} /> Cancelar edição
+                  {isFormOpen ? (
+                    <>
+                      <span>Recolher</span>
+                      <ChevronUp size={13} />
+                    </>
+                  ) : (
+                    <>
+                      <span>+ Novo Item</span>
+                      <ChevronDown size={13} />
+                    </>
+                  )}
                 </button>
-              )}
+              </div>
             </div>
 
-            <form onSubmit={handleSaveItem} className="space-y-4">
+            {isFormOpen && (
+              <div className="p-3 sm:p-5 border-t border-indigo-100/70">
+                <form onSubmit={handleSaveItem} className="space-y-3 sm:space-y-4">
               {/* Tipo e Descrição */}
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4">
                 {/* Tipo: Despesa ou Receita */}
@@ -708,6 +764,8 @@ export const RecurrentTransactionsModal: React.FC<RecurrentTransactionsModalProp
               </div>
             </form>
           </div>
+        )}
+      </div>
 
           {/* Lista de Itens Recorrentes Salvos */}
           <div className="space-y-3">
@@ -757,40 +815,40 @@ export const RecurrentTransactionsModal: React.FC<RecurrentTransactionsModalProp
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-2.5">
+              <div className="grid grid-cols-1 gap-2 sm:gap-2.5">
                 {recurrentItems.map((item) => {
                   const calculatedAmount = calculateItemAmount(item);
                   return (
                     <div
                       key={item.id}
-                      className={`p-3.5 sm:p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                      className={`p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 ${
                         item.active
                           ? 'bg-white border-slate-200 shadow-sm'
                           : 'bg-slate-50/80 border-slate-200/60 opacity-60'
                       }`}
                     >
                       {/* Lado Esquerdo: Botão Ativar/Desativar + Informações */}
-                      <div className="flex items-center gap-3 sm:gap-4 flex-1">
+                      <div className="flex items-center gap-2.5 sm:gap-4 flex-1 min-w-0">
                         {/* Botão Ativar / Desativar */}
                         <button
                           type="button"
                           onClick={() => handleToggleActive(item)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-sm ${
+                          className={`px-2.5 py-1.5 rounded-lg sm:rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-sm shrink-0 ${
                             item.active
                               ? 'bg-emerald-600 text-white hover:bg-emerald-700'
                               : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                           }`}
                           title={item.active ? 'Clique para desativar este mês' : 'Clique para ativar este mês'}
                         >
-                          <Power size={13} />
+                          <Power size={12} />
                           <span>{item.active ? 'Ativo' : 'Inativo'}</span>
                         </button>
 
                         {/* Detalhes do Item */}
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
+                        <div className="space-y-0.5 sm:space-y-1 min-w-0">
+                          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                             <span
-                              className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                              className={`text-[9px] sm:text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider ${
                                 item.type === 'income'
                                   ? 'bg-emerald-100 text-emerald-800'
                                   : 'bg-rose-100 text-rose-800'
@@ -799,39 +857,41 @@ export const RecurrentTransactionsModal: React.FC<RecurrentTransactionsModalProp
                               {item.type === 'income' ? 'Receita' : 'Despesa'}
                             </span>
 
-                            <h5 className="font-black text-slate-900 text-sm">{item.description || item.category}</h5>
+                            <h5 className="font-black text-slate-900 text-xs sm:text-sm truncate">
+                              {item.description || item.category}
+                            </h5>
 
                             {!item.active && (
-                              <span className="text-[10px] font-bold text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded">
-                                Não será lançado
+                              <span className="text-[9px] font-bold text-slate-400 bg-slate-200 px-1 py-0.5 rounded">
+                                Desativado
                               </span>
                             )}
                           </div>
 
-                          <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
+                          <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-slate-500 flex-wrap">
                             <span className="font-semibold text-slate-700">{item.category}</span>
                             {item.subcategory && (
                               <>
                                 <span className="text-slate-300">•</span>
-                                <span>{item.subcategory}</span>
+                                <span className="truncate">{item.subcategory}</span>
                               </>
                             )}
                             <span className="text-slate-300">•</span>
-                            <span className="text-[11px] text-slate-400">
+                            <span className="text-[10px] sm:text-[11px] text-slate-400">
                               {item.valueType === 'fixed'
-                                ? 'Valor Fixo'
-                                : `${item.percentage}% ${item.percentageBase === 'expense' ? 'das despesas' : 'da receita'}`}
+                                ? 'Fixo'
+                                : `${item.percentage}% ${item.percentageBase === 'expense' ? 'despesas' : 'receita'}`}
                             </span>
                           </div>
                         </div>
                       </div>
 
                       {/* Lado Direito: Valor e Ações */}
-                      <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-2 sm:pt-0">
+                      <div className="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-t-0 pt-1.5 sm:pt-0 shrink-0">
                         {/* Valor Formatado */}
-                        <div className="text-right">
+                        <div className="text-left sm:text-right">
                           <div
-                            className={`font-black text-base ${
+                            className={`font-black text-sm sm:text-base ${
                               item.type === 'income' ? 'text-emerald-600' : 'text-slate-900'
                             }`}
                           >
@@ -839,7 +899,7 @@ export const RecurrentTransactionsModal: React.FC<RecurrentTransactionsModalProp
                           </div>
                           {item.valueType === 'percentage' && (
                             <span className="text-[10px] text-indigo-600 font-bold block">
-                              ({item.percentage}% calculados)
+                              ({item.percentage}%)
                             </span>
                           )}
                         </div>
@@ -849,18 +909,18 @@ export const RecurrentTransactionsModal: React.FC<RecurrentTransactionsModalProp
                           <button
                             type="button"
                             onClick={() => handleEditItem(item)}
-                            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                            className="p-1.5 sm:p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
                             title="Editar este item"
                           >
-                            <Edit3 size={16} />
+                            <Edit3 size={15} />
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDeleteItem(item.id!, item.description)}
-                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                            className="p-1.5 sm:p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
                             title="Excluir da lista"
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={15} />
                           </button>
                         </div>
                       </div>
@@ -872,75 +932,77 @@ export const RecurrentTransactionsModal: React.FC<RecurrentTransactionsModalProp
           </div>
         </div>
 
-        {/* Footer com Resumo do Lançamento e Botão "Confirmar Lançamento" */}
-        <div className="p-4 sm:p-6 bg-slate-900 text-white border-t border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          
-          {/* Resumo */}
-          <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-xs">
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Itens para Lançar</span>
-              <span className="font-black text-base text-white">
-                {activeItems.length} <span className="text-xs text-slate-400 font-normal">de {recurrentItems.length} ativos</span>
-              </span>
+        {/* Banner Inferior (Footer com Resumo do Lançamento e Ações) */}
+        <div className="p-4 sm:p-6 bg-slate-900 text-white border-t border-slate-800">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+            
+            {/* Resumo dos Valores e Status */}
+            <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-xs">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Itens para Lançar</span>
+                <span className="font-black text-sm sm:text-base text-white">
+                  {activeItems.length} <span className="text-xs text-slate-400 font-normal">de {recurrentItems.length} ativos</span>
+                </span>
+              </div>
+
+              <div className="h-8 w-px bg-slate-800 hidden sm:block"></div>
+
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-rose-400 block">Total Despesas</span>
+                <span className="font-black text-sm sm:text-base text-rose-300">
+                  R$ {totalActiveExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+
+              <div className="h-8 w-px bg-slate-800 hidden sm:block"></div>
+
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 block">Total Receitas</span>
+                <span className="font-black text-sm sm:text-base text-emerald-300">
+                  R$ {totalActiveIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+
+              <div className="h-8 w-px bg-slate-800 hidden sm:block"></div>
+
+              {/* Checkbox Marcar como Pago */}
+              <label className="flex items-center gap-2 cursor-pointer select-none py-1">
+                <input
+                  type="checkbox"
+                  checked={markAsPaid}
+                  onChange={(e) => setMarkAsPaid(e.target.checked)}
+                  className="rounded text-indigo-500 focus:ring-indigo-400 bg-slate-800 border-slate-700 w-4 h-4 cursor-pointer"
+                />
+                <span className="text-slate-300 font-semibold text-xs">Lançar já como pago</span>
+              </label>
             </div>
 
-            <div className="h-8 w-px bg-slate-800 hidden sm:block"></div>
+            {/* Botões de Ação */}
+            <div className="flex items-center justify-end gap-3 shrink-0 pt-3 lg:pt-0 border-t border-slate-800 lg:border-t-0">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2.5 text-xs sm:text-sm font-bold text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all"
+              >
+                Fechar
+              </button>
 
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-rose-400 block">Total Despesas</span>
-              <span className="font-black text-base text-rose-300">
-                R$ {totalActiveExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </span>
+              <button
+                type="button"
+                onClick={handleConfirmLaunch}
+                disabled={confirmingLaunch || activeItems.length === 0}
+                className="px-5 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-xs sm:text-sm rounded-xl sm:rounded-2xl shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+              >
+                {confirmingLaunch ? (
+                  <span>Lançando transações...</span>
+                ) : (
+                  <>
+                    <Sparkles size={16} />
+                    <span>Confirmar Lançamento ({activeItems.length})</span>
+                  </>
+                )}
+              </button>
             </div>
-
-            <div className="h-8 w-px bg-slate-800 hidden sm:block"></div>
-
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 block">Total Receitas</span>
-              <span className="font-black text-base text-emerald-300">
-                R$ {totalActiveIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-
-            <div className="h-8 w-px bg-slate-800 hidden sm:block"></div>
-
-            {/* Checkbox Marcar como Pago */}
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={markAsPaid}
-                onChange={(e) => setMarkAsPaid(e.target.checked)}
-                className="rounded text-indigo-500 focus:ring-indigo-400 bg-slate-800 border-slate-700"
-              />
-              <span className="text-slate-300 font-semibold text-xs">Lançar já como pago</span>
-            </label>
-          </div>
-
-          {/* Botões de Ação */}
-          <div className="flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2.5 text-xs font-bold text-slate-400 hover:text-white transition-all"
-            >
-              Fechar
-            </button>
-
-            <button
-              type="button"
-              onClick={handleConfirmLaunch}
-              disabled={confirmingLaunch || activeItems.length === 0}
-              className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-sm rounded-2xl shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
-            >
-              {confirmingLaunch ? (
-                <span>Lançando transações...</span>
-              ) : (
-                <>
-                  <Sparkles size={18} />
-                  <span>Confirmar Lançamento ({activeItems.length})</span>
-                </>
-              )}
-            </button>
           </div>
         </div>
 
